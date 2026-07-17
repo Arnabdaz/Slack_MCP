@@ -25,9 +25,6 @@ class ScopeError(Exception):
 class SlackApiError(Exception):
     """Raised when the Slack API returns an error response."""
 
-    def __init__(self, message: str) -> None:
-        super().__init__(message)
-
 
 def is_public_channel(channel_obj: dict[str, Any]) -> bool:
     """Return True only for public channels (not private, DM, group DM, or legacy group)."""
@@ -68,7 +65,7 @@ class SlackClient:
                     limit=200,
                     cursor=cursor or None,
                 )
-            except _SdkSlackApiError as e:  # pragma: no cover - exercised in Task 4 tests
+            except _SdkSlackApiError as e:
                 msg = f"Slack API error: {e.response['error']}"
                 raise SlackApiError(msg) from e
             for ch in resp["channels"]:

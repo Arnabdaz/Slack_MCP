@@ -1,4 +1,4 @@
-"""MCP tool definitions for Slack read operations.
+"""MCP tool definitions for the Slack MCP server.
 
 Includes read-only tools and write tools with two-step confirmation.
 """
