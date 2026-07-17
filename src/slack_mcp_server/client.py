@@ -53,7 +53,6 @@ class SlackClient:
                 AsyncRateLimitErrorRetryHandler(max_retry_count=3)
             )
         self._user_names: dict[str, str] = {}
-        self._public_ids: set[str] = set()
 
     async def close(self) -> None:
         """Close the underlying HTTP session."""
@@ -103,19 +102,15 @@ class SlackClient:
                 "This server only accesses public channels."
             )
             raise ScopeError(msg)
-        self._public_ids.add(obj["id"])
         return obj
 
     async def _ensure_public(self, channel_id: str) -> None:
-        """Raise ScopeError unless channel_id is a validated public channel.
+        """Raise ScopeError unless channel_id is a public channel.
 
-        Cheap in the normal flow: a tool that already called resolve_channel
-        populated the cache, so this is a set membership check. A direct call
-        with an unvalidated id re-validates via resolve_channel (which raises
-        ScopeError for private/DM/mpim/group channels).
+        Re-validates on every call (deliberately uncached) so a channel that
+        has been converted to private, archived, or deleted is caught
+        immediately — the guard never fails open on stale state.
         """
-        if channel_id in self._public_ids:
-            return
         await self.resolve_channel(channel_id)
 
     async def search_messages(self, query: str, count: int = 20) -> list[dict[str, Any]]:

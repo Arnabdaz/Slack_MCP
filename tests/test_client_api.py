@@ -60,11 +60,13 @@ class TestResolveUsers:
 class TestConversationsReplies:
     async def test_returns_messages_list(self) -> None:
         web = AsyncMock()
+        web.conversations_info = AsyncMock(
+            return_value={"channel": {"id": "C1", "name": "eng", "is_channel": True, "is_private": False}}
+        )
         web.conversations_replies = AsyncMock(
             return_value={"messages": [{"ts": "1", "text": "root"}, {"ts": "2", "text": "reply"}]}
         )
         client = _client(web)
-        client._public_ids.add("C1")  # noqa: SLF001
         msgs = await client.conversations_replies("C1", "1")
         assert [m["text"] for m in msgs] == ["root", "reply"]
 
@@ -72,9 +74,11 @@ class TestConversationsReplies:
 class TestPostMessage:
     async def test_returns_ts_and_channel(self) -> None:
         web = AsyncMock()
+        web.conversations_info = AsyncMock(
+            return_value={"channel": {"id": "C1", "name": "eng", "is_channel": True, "is_private": False}}
+        )
         web.chat_postMessage = AsyncMock(return_value={"ts": "99.1", "channel": "C1"})
         client = _client(web)
-        client._public_ids.add("C1")  # noqa: SLF001
         result = await client.post_message("C1", "hello", thread_ts="1.0")
         assert result["ts"] == "99.1"
         web.chat_postMessage.assert_awaited_once_with(channel="C1", text="hello", thread_ts="1.0")
@@ -118,14 +122,19 @@ class TestScopeGuardOnApiMethods:
         with pytest.raises(ScopeError):
             await client.post_message("C9", "hello")
 
-    async def test_cache_hit_skips_conversations_info(self) -> None:
-        """Pre-seeded id bypasses conversations_info entirely (cache-hit path)."""
+    async def test_no_drift_revalidates_every_call(self) -> None:
+        """Guard re-validates on every call — stale public state does not persist."""
         web = AsyncMock()
+        public_channel = {"channel": {"id": "C1", "name": "eng", "is_channel": True, "is_private": False}}
+        private_channel = {"channel": {"id": "C1", "name": "eng", "is_channel": True, "is_private": True}}
+        web.conversations_info = AsyncMock(side_effect=[public_channel, private_channel])
         web.conversations_history = AsyncMock(
             return_value={"messages": [{"ts": "1", "text": "hi"}]}
         )
         client = _client(web)
-        client._public_ids.add("C1")  # noqa: SLF001
+        # First call: channel is public — should succeed
         msgs = await client.conversations_history("C1")
         assert msgs[0]["text"] == "hi"
-        web.conversations_info.assert_not_awaited()
+        # Second call: channel is now private — guard must catch it
+        with pytest.raises(ScopeError):
+            await client.conversations_history("C1")
