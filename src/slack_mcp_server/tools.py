@@ -9,7 +9,7 @@ from typing import Any
 
 from mcp.types import ToolAnnotations
 
-from . import formatting
+from . import confirm, formatting
 from .app import mcp
 from .client import ScopeError, SlackApiError, get_slack_client
 
@@ -156,3 +156,84 @@ async def resolve_users(user_ids: list[str]) -> dict[str, Any]:
         return {"error": str(e)}
     except Exception as e:
         return {"error": f"Error resolving users: {e!s}"}
+
+
+@mcp.tool()
+async def draft_message(
+    channel: str, text: str, thread_ts: str | None = None
+) -> dict[str, Any]:
+    """
+    Prepare a message for sending and return a preview + confirmation token.
+
+    THIS DOES NOT SEND ANYTHING. It validates the target is a public channel,
+    renders exactly what would be posted, and returns a one-time
+    `confirmation_token`. To actually post, the user must review this preview and
+    then call `send_message(confirmation_token=...)`. Always show the user this
+    preview and get their explicit approval before calling send_message.
+
+    Args:
+        channel: Channel id or "#name". Must be a public channel.
+        text: The exact message text to post.
+        thread_ts: Optional thread root timestamp to reply in a thread.
+    """
+    try:
+        client = get_slack_client()
+        channel_obj = await client.resolve_channel(channel)
+        payload = confirm.DraftPayload(
+            channel_id=channel_obj["id"],
+            channel_name=channel_obj.get("name", channel),
+            text=text,
+            thread_ts=thread_ts,
+        )
+        token = confirm.drafts.create(payload)
+        target = f"#{payload.channel_name}"
+        if thread_ts:
+            target += f" (reply in thread {thread_ts})"
+        preview = [
+            "# Draft — NOT yet sent",
+            f"**To:** {target}",
+            "**Message:**",
+            payload.text,
+            "",
+            f"**confirmation_token:** `{token}`",
+            "",
+            "Review the above. To send, call "
+            f"`send_message(confirmation_token=\"{token}\")`.",
+        ]
+        return {"result": "\n".join(preview)}
+    except (ScopeError, SlackApiError) as e:
+        return {"error": str(e)}
+    except Exception as e:
+        return {"error": f"Error drafting message: {e!s}"}
+
+
+@mcp.tool()
+async def send_message(confirmation_token: str) -> dict[str, Any]:
+    """
+    Send a previously drafted message. Requires a valid confirmation_token from
+    draft_message. This is the ONLY tool that posts to Slack.
+
+    Only call this after the user has reviewed the draft_message preview and
+    explicitly approved sending.
+
+    Args:
+        confirmation_token: The one-time token returned by draft_message.
+    """
+    try:
+        payload = confirm.drafts.consume(confirmation_token)
+    except confirm.DraftError as e:
+        return {"error": str(e)}
+    try:
+        client = get_slack_client()
+        posted = await client.post_message(
+            payload.channel_id, payload.text, thread_ts=payload.thread_ts
+        )
+        permalink = await client.get_permalink(posted["channel"], posted["ts"])
+    except SlackApiError as e:
+        return {"error": str(e)}
+    except Exception as e:
+        return {"error": f"Error sending message: {e!s}"}
+    else:
+        return {
+            "result": f"Message sent to #{payload.channel_name}.\nPermalink: {permalink}"
+        }
