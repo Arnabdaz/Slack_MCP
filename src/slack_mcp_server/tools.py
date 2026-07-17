@@ -1,6 +1,6 @@
 """MCP tool definitions for Slack read operations.
 
-Write tools (draft_message/send_message) are added in a later task.
+Includes read-only tools and write tools with two-step confirmation.
 """
 
 from __future__ import annotations
@@ -159,9 +159,7 @@ async def resolve_users(user_ids: list[str]) -> dict[str, Any]:
 
 
 @mcp.tool()
-async def draft_message(
-    channel: str, text: str, thread_ts: str | None = None
-) -> dict[str, Any]:
+async def draft_message(channel: str, text: str, thread_ts: str | None = None) -> dict[str, Any]:
     """
     Prepare a message for sending and return a preview + confirmation token.
 
@@ -197,8 +195,7 @@ async def draft_message(
             "",
             f"**confirmation_token:** `{token}`",
             "",
-            "Review the above. To send, call "
-            f"`send_message(confirmation_token=\"{token}\")`.",
+            "Review the above. To send, call " f'`send_message(confirmation_token="{token}")`.',
         ]
         return {"result": "\n".join(preview)}
     except (ScopeError, SlackApiError) as e:
@@ -234,6 +231,4 @@ async def send_message(confirmation_token: str) -> dict[str, Any]:
     except Exception as e:
         return {"error": f"Error sending message: {e!s}"}
     else:
-        return {
-            "result": f"Message sent to #{payload.channel_name}.\nPermalink: {permalink}"
-        }
+        return {"result": f"Message sent to #{payload.channel_name}.\nPermalink: {permalink}"}

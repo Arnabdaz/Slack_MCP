@@ -19,8 +19,13 @@ class TestSearchMessages:
 
         client = _mock_client(
             search_messages=[
-                {"ts": "1.0", "text": "DSE-1 is fixed", "user": "U1",
-                 "channel": {"id": "C1", "name": "eng"}, "permalink": "https://x/p/1"},
+                {
+                    "ts": "1.0",
+                    "text": "DSE-1 is fixed",
+                    "user": "U1",
+                    "channel": {"id": "C1", "name": "eng"},
+                    "permalink": "https://x/p/1",
+                },
             ],
             resolve_users={"U1": "alice"},
         )
@@ -57,8 +62,10 @@ class TestReadThread:
         client = MagicMock()
         client.resolve_channel = AsyncMock(return_value={"id": "C1", "name": "eng"})
         client.conversations_replies = AsyncMock(
-            return_value=[{"user": "U1", "text": "root", "ts": "1.0"},
-                          {"user": "U2", "text": "reply", "ts": "2.0"}]
+            return_value=[
+                {"user": "U1", "text": "root", "ts": "1.0"},
+                {"user": "U2", "text": "reply", "ts": "2.0"},
+            ]
         )
         client.resolve_users = AsyncMock(return_value={"U1": "alice", "U2": "bob"})
         with patch("slack_mcp_server.tools.get_slack_client", return_value=client):

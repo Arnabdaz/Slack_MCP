@@ -21,12 +21,27 @@ class TestSearchMessages:
             return_value={
                 "messages": {
                     "matches": [
-                        {"ts": "1", "text": "public hit",
-                         "channel": {"id": "C1", "name": "eng", "is_channel": True, "is_private": False}},
-                        {"ts": "2", "text": "private hit",
-                         "channel": {"id": "C2", "name": "secret", "is_channel": True, "is_private": True}},
-                        {"ts": "3", "text": "dm hit",
-                         "channel": {"id": "D1", "is_im": True}},
+                        {
+                            "ts": "1",
+                            "text": "public hit",
+                            "channel": {
+                                "id": "C1",
+                                "name": "eng",
+                                "is_channel": True,
+                                "is_private": False,
+                            },
+                        },
+                        {
+                            "ts": "2",
+                            "text": "private hit",
+                            "channel": {
+                                "id": "C2",
+                                "name": "secret",
+                                "is_channel": True,
+                                "is_private": True,
+                            },
+                        },
+                        {"ts": "3", "text": "dm hit", "channel": {"id": "D1", "is_im": True}},
                     ]
                 }
             }
@@ -39,7 +54,9 @@ class TestResolveUsers:
     async def test_caches_and_avoids_second_call(self) -> None:
         web = AsyncMock()
         web.users_info = AsyncMock(
-            return_value={"user": {"id": "U1", "profile": {"display_name": "alice"}, "real_name": "Alice A"}}
+            return_value={
+                "user": {"id": "U1", "profile": {"display_name": "alice"}, "real_name": "Alice A"}
+            }
         )
         client = _client(web)
         first = await client.resolve_users(["U1"])
@@ -51,7 +68,9 @@ class TestResolveUsers:
     async def test_falls_back_to_real_name_then_id(self) -> None:
         web = AsyncMock()
         web.users_info = AsyncMock(
-            return_value={"user": {"id": "U2", "profile": {"display_name": ""}, "real_name": "Bob B"}}
+            return_value={
+                "user": {"id": "U2", "profile": {"display_name": ""}, "real_name": "Bob B"}
+            }
         )
         names = await _client(web).resolve_users(["U2"])
         assert names == {"U2": "Bob B"}
@@ -61,7 +80,9 @@ class TestConversationsReplies:
     async def test_returns_messages_list(self) -> None:
         web = AsyncMock()
         web.conversations_info = AsyncMock(
-            return_value={"channel": {"id": "C1", "name": "eng", "is_channel": True, "is_private": False}}
+            return_value={
+                "channel": {"id": "C1", "name": "eng", "is_channel": True, "is_private": False}
+            }
         )
         web.conversations_replies = AsyncMock(
             return_value={"messages": [{"ts": "1", "text": "root"}, {"ts": "2", "text": "reply"}]}
@@ -75,7 +96,9 @@ class TestPostMessage:
     async def test_returns_ts_and_channel(self) -> None:
         web = AsyncMock()
         web.conversations_info = AsyncMock(
-            return_value={"channel": {"id": "C1", "name": "eng", "is_channel": True, "is_private": False}}
+            return_value={
+                "channel": {"id": "C1", "name": "eng", "is_channel": True, "is_private": False}
+            }
         )
         web.chat_postMessage = AsyncMock(return_value={"ts": "99.1", "channel": "C1"})
         client = _client(web)
@@ -125,8 +148,12 @@ class TestScopeGuardOnApiMethods:
     async def test_no_drift_revalidates_every_call(self) -> None:
         """Guard re-validates on every call — stale public state does not persist."""
         web = AsyncMock()
-        public_channel = {"channel": {"id": "C1", "name": "eng", "is_channel": True, "is_private": False}}
-        private_channel = {"channel": {"id": "C1", "name": "eng", "is_channel": True, "is_private": True}}
+        public_channel = {
+            "channel": {"id": "C1", "name": "eng", "is_channel": True, "is_private": False}
+        }
+        private_channel = {
+            "channel": {"id": "C1", "name": "eng", "is_channel": True, "is_private": True}
+        }
         web.conversations_info = AsyncMock(side_effect=[public_channel, private_channel])
         web.conversations_history = AsyncMock(
             return_value={"messages": [{"ts": "1", "text": "hi"}]}

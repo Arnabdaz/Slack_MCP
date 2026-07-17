@@ -49,9 +49,7 @@ class SlackClient:
             self._web: AsyncWebClient = web_client
         else:
             self._web = AsyncWebClient(token=token)
-            self._web.retry_handlers.append(
-                AsyncRateLimitErrorRetryHandler(max_retry_count=3)
-            )
+            self._web.retry_handlers.append(AsyncRateLimitErrorRetryHandler(max_retry_count=3))
         self._user_names: dict[str, str] = {}
 
     async def close(self) -> None:
@@ -124,9 +122,7 @@ class SlackClient:
         matches: list[dict[str, Any]] = messages_obj.get("matches") or []
         return [m for m in matches if is_public_channel(m.get("channel") or {})]
 
-    async def conversations_replies(
-        self, channel_id: str, thread_ts: str
-    ) -> list[dict[str, Any]]:
+    async def conversations_replies(self, channel_id: str, thread_ts: str) -> list[dict[str, Any]]:
         """Return a thread's messages (root + replies)."""
         await self._ensure_public(channel_id)
         try:
@@ -152,9 +148,7 @@ class SlackClient:
             raise SlackApiError(msg) from e
         return list(resp.get("messages", []))
 
-    async def list_public_channels(
-        self, name_filter: str | None = None
-    ) -> list[dict[str, Any]]:
+    async def list_public_channels(self, name_filter: str | None = None) -> list[dict[str, Any]]:
         """Return public channels (id, name, topic), optionally substring-filtered by name."""
         out: list[dict[str, Any]] = []
         cursor = ""

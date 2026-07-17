@@ -83,5 +83,8 @@ class TestResolveChannel:
 
 class TestGetSlackClient:
     def test_missing_token_raises(self) -> None:
-        with patch.dict("os.environ", {}, clear=True), pytest.raises(ValueError, match="SLACK_USER_TOKEN"):
+        with (
+            patch.dict("os.environ", {}, clear=True),
+            pytest.raises(ValueError, match="SLACK_USER_TOKEN"),
+        ):
             get_slack_client()

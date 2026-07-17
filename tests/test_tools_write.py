@@ -38,7 +38,7 @@ class TestDraftMessage:
         assert "Ship it" in result["result"]
         client.post_message.assert_not_called()
         # exactly one draft is now pending
-        assert len(confirm.drafts._entries) == 1  # noqa: SLF001
+        assert len(confirm.drafts._entries) == 1
 
     async def test_scope_error_surfaces(self) -> None:
         from slack_mcp_server.client import ScopeError
@@ -58,8 +58,8 @@ class TestSendMessage:
 
         client = _client()
         with patch("slack_mcp_server.tools.get_slack_client", return_value=client):
-            draft = await draft_message("#eng-prs", "Ship it")
-            token = confirm.drafts._entries  # noqa: SLF001
+            _ = await draft_message("#eng-prs", "Ship it")
+            token = confirm.drafts._entries
             (the_token,) = token.keys()
             result = await send_message(the_token)
         assert "result" in result
@@ -81,7 +81,7 @@ class TestSendMessage:
         client = _client()
         with patch("slack_mcp_server.tools.get_slack_client", return_value=client):
             await draft_message("#eng-prs", "Ship it")
-            (the_token,) = confirm.drafts._entries.keys()  # noqa: SLF001
+            (the_token,) = confirm.drafts._entries.keys()
             await send_message(the_token)
             second = await send_message(the_token)
         assert "error" in second

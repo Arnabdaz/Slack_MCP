@@ -48,4 +48,5 @@ class TestFormatThread:
         msgs = [_msg("U1", "root", "1.0"), _msg("U2", "reply", "2.0")]
         out = format_thread(msgs, {"U1": "alice", "U2": "bob"}, channel_name="eng")
         assert out.index("root") < out.index("reply")
-        assert "alice" in out and "bob" in out
+        assert "alice" in out
+        assert "bob" in out
