@@ -164,7 +164,7 @@ class SlackClient:
             for ch in resp["channels"]:
                 name = ch.get("name", "")
                 if needle is None or needle in name.lower():
-                    topic = ch.get("topic", {}).get("value", "")
+                    topic = (ch.get("topic") or {}).get("value", "")
                     out.append({"id": ch["id"], "name": name, "topic": topic})
             meta: dict[str, Any] = resp.get("response_metadata") or {}
             cursor = meta.get("next_cursor", "")

@@ -165,3 +165,16 @@ class TestScopeGuardOnApiMethods:
         # Second call: channel is now private — guard must catch it
         with pytest.raises(ScopeError):
             await client.conversations_history("C1")
+
+
+class TestListPublicChannelsTopicNull:
+    async def test_null_topic_does_not_crash(self) -> None:
+        web = AsyncMock()
+        web.conversations_list = AsyncMock(
+            return_value={
+                "channels": [{"id": "C1", "name": "eng", "topic": None}],
+                "response_metadata": {"next_cursor": ""},
+            }
+        )
+        channels = await _client(web).list_public_channels()
+        assert channels[0]["topic"] == ""
