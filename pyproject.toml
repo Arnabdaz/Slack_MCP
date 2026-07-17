@@ -1,0 +1,77 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "slack-mcp"
+version = "0.1.0"
+description = "MCP server for Slack — search/read public-channel discussions and send messages with strict confirmation"
+readme = "README.md"
+license = {text = "MIT"}
+requires-python = ">=3.10"
+keywords = ["mcp", "slack", "model-context-protocol"]
+
+dependencies = [
+    "mcp>=1.9.0",
+    "slack_sdk>=3.27.0",
+    "pydantic>=2.0.0",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=7.0.0",
+    "pytest-asyncio>=0.21.0",
+    "black>=23.0.0",
+    "ruff>=0.1.0",
+    "mypy>=1.0.0",
+]
+
+[project.scripts]
+slack-mcp = "slack_mcp_server.server:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/slack_mcp_server"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "N", "UP", "ANN", "S", "B", "C4", "DTZ", "T10", "EM", "G", "PIE", "PT", "RET", "SIM", "ARG", "PTH", "PD", "PGH", "PL", "TRY", "NPY", "PERF", "RUF"]
+ignore = ["ANN401", "S101", "PLR0911", "PLR0912", "PLR0913", "PLR0915"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["S101", "S105", "S106", "N802", "PLR2004", "PLC0415"]
+"src/slack_mcp_server/tools.py" = ["E501"]
+
+[tool.black]
+line-length = 100
+target-version = ["py310"]
+
+[tool.mypy]
+python_version = "3.10"
+strict = true
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+check_untyped_defs = true
+disallow_untyped_decorators = true
+no_implicit_optional = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+warn_no_return = true
+warn_unreachable = true
+strict_equality = true
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+python_files = ["test_*.py", "*_test.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = "-p no:anyio"
+filterwarnings = [
+    "ignore::pytest.PytestAssertRewriteWarning",
+    "ignore:Module already imported so cannot be rewritten.*anyio:pytest.PytestAssertRewriteWarning"
+]
