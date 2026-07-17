@@ -104,6 +104,107 @@ class SlackClient:
             raise ScopeError(msg)
         return obj
 
+    async def search_messages(self, query: str, count: int = 20) -> list[dict[str, Any]]:
+        """Search messages (search.messages); return only public-channel matches."""
+        try:
+            resp = await self._web.search_messages(query=query, count=count)
+        except _SdkSlackApiError as e:
+            msg = f"Slack API error: {e.response['error']}"
+            raise SlackApiError(msg) from e
+        messages_obj: dict[str, Any] = resp.get("messages") or {}
+        matches: list[dict[str, Any]] = messages_obj.get("matches") or []
+        return [m for m in matches if is_public_channel(m.get("channel") or {})]
+
+    async def conversations_replies(
+        self, channel_id: str, thread_ts: str
+    ) -> list[dict[str, Any]]:
+        """Return a thread's messages (root + replies)."""
+        try:
+            resp = await self._web.conversations_replies(channel=channel_id, ts=thread_ts)
+        except _SdkSlackApiError as e:
+            msg = f"Slack API error: {e.response['error']}"
+            raise SlackApiError(msg) from e
+        return list(resp.get("messages", []))
+
+    async def conversations_history(
+        self, channel_id: str, limit: int = 30, around_ts: str | None = None
+    ) -> list[dict[str, Any]]:
+        """Return recent messages, or a window ending at `around_ts` when given."""
+        kwargs: dict[str, Any] = {"channel": channel_id, "limit": limit}
+        if around_ts is not None:
+            kwargs["latest"] = around_ts
+            kwargs["inclusive"] = True
+        try:
+            resp = await self._web.conversations_history(**kwargs)
+        except _SdkSlackApiError as e:
+            msg = f"Slack API error: {e.response['error']}"
+            raise SlackApiError(msg) from e
+        return list(resp.get("messages", []))
+
+    async def list_public_channels(
+        self, name_filter: str | None = None
+    ) -> list[dict[str, Any]]:
+        """Return public channels (id, name, topic), optionally substring-filtered by name."""
+        out: list[dict[str, Any]] = []
+        cursor = ""
+        needle = name_filter.lower() if name_filter else None
+        while True:
+            try:
+                resp = await self._web.conversations_list(
+                    types="public_channel", limit=200, cursor=cursor or None
+                )
+            except _SdkSlackApiError as e:
+                msg = f"Slack API error: {e.response['error']}"
+                raise SlackApiError(msg) from e
+            for ch in resp["channels"]:
+                name = ch.get("name", "")
+                if needle is None or needle in name.lower():
+                    topic = ch.get("topic", {}).get("value", "")
+                    out.append({"id": ch["id"], "name": name, "topic": topic})
+            meta: dict[str, Any] = resp.get("response_metadata") or {}
+            cursor = meta.get("next_cursor", "")
+            if not cursor:
+                break
+        return out
+
+    async def get_permalink(self, channel_id: str, message_ts: str) -> str:
+        """Return a permalink URL for a message."""
+        try:
+            resp = await self._web.chat_getPermalink(channel=channel_id, message_ts=message_ts)
+        except _SdkSlackApiError as e:
+            msg = f"Slack API error: {e.response['error']}"
+            raise SlackApiError(msg) from e
+        return str(resp["permalink"])
+
+    async def resolve_users(self, user_ids: list[str]) -> dict[str, str]:
+        """Map user ids to display names, caching results on the client."""
+        for uid in user_ids:
+            if not uid or uid in self._user_names:
+                continue
+            try:
+                resp = await self._web.users_info(user=uid)
+            except _SdkSlackApiError:
+                self._user_names[uid] = uid
+                continue
+            profile = resp["user"].get("profile", {})
+            self._user_names[uid] = (
+                profile.get("display_name") or resp["user"].get("real_name") or uid
+            )
+        return {uid: self._user_names[uid] for uid in user_ids if uid}
+
+    async def post_message(
+        self, channel_id: str, text: str, thread_ts: str | None = None
+    ) -> dict[str, Any]:
+        """Post a message via chat.postMessage. The ONLY write path."""
+        try:
+            resp = await self._web.chat_postMessage(
+                channel=channel_id, text=text, thread_ts=thread_ts
+            )
+        except _SdkSlackApiError as e:
+            msg = f"Slack API error: {e.response['error']}"
+            raise SlackApiError(msg) from e
+        return {"ts": resp["ts"], "channel": resp["channel"]}
+
 
 _slack_client: SlackClient | None = None
 
