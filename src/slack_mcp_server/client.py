@@ -53,6 +53,7 @@ class SlackClient:
                 AsyncRateLimitErrorRetryHandler(max_retry_count=3)
             )
         self._user_names: dict[str, str] = {}
+        self._public_ids: set[str] = set()
 
     async def close(self) -> None:
         """Close the underlying HTTP session."""
@@ -102,7 +103,20 @@ class SlackClient:
                 "This server only accesses public channels."
             )
             raise ScopeError(msg)
+        self._public_ids.add(obj["id"])
         return obj
+
+    async def _ensure_public(self, channel_id: str) -> None:
+        """Raise ScopeError unless channel_id is a validated public channel.
+
+        Cheap in the normal flow: a tool that already called resolve_channel
+        populated the cache, so this is a set membership check. A direct call
+        with an unvalidated id re-validates via resolve_channel (which raises
+        ScopeError for private/DM/mpim/group channels).
+        """
+        if channel_id in self._public_ids:
+            return
+        await self.resolve_channel(channel_id)
 
     async def search_messages(self, query: str, count: int = 20) -> list[dict[str, Any]]:
         """Search messages (search.messages); return only public-channel matches."""
@@ -119,6 +133,7 @@ class SlackClient:
         self, channel_id: str, thread_ts: str
     ) -> list[dict[str, Any]]:
         """Return a thread's messages (root + replies)."""
+        await self._ensure_public(channel_id)
         try:
             resp = await self._web.conversations_replies(channel=channel_id, ts=thread_ts)
         except _SdkSlackApiError as e:
@@ -130,6 +145,7 @@ class SlackClient:
         self, channel_id: str, limit: int = 30, around_ts: str | None = None
     ) -> list[dict[str, Any]]:
         """Return recent messages, or a window ending at `around_ts` when given."""
+        await self._ensure_public(channel_id)
         kwargs: dict[str, Any] = {"channel": channel_id, "limit": limit}
         if around_ts is not None:
             kwargs["latest"] = around_ts
@@ -169,6 +185,7 @@ class SlackClient:
 
     async def get_permalink(self, channel_id: str, message_ts: str) -> str:
         """Return a permalink URL for a message."""
+        await self._ensure_public(channel_id)
         try:
             resp = await self._web.chat_getPermalink(channel=channel_id, message_ts=message_ts)
         except _SdkSlackApiError as e:
@@ -196,6 +213,7 @@ class SlackClient:
         self, channel_id: str, text: str, thread_ts: str | None = None
     ) -> dict[str, Any]:
         """Post a message via chat.postMessage. The ONLY write path."""
+        await self._ensure_public(channel_id)
         try:
             resp = await self._web.chat_postMessage(
                 channel=channel_id, text=text, thread_ts=thread_ts

@@ -5,7 +5,9 @@ from __future__ import annotations
 from typing import Any
 from unittest.mock import AsyncMock
 
-from slack_mcp_server.client import SlackClient
+import pytest
+
+from slack_mcp_server.client import ScopeError, SlackClient
 
 
 def _client(web: Any) -> SlackClient:
@@ -61,7 +63,9 @@ class TestConversationsReplies:
         web.conversations_replies = AsyncMock(
             return_value={"messages": [{"ts": "1", "text": "root"}, {"ts": "2", "text": "reply"}]}
         )
-        msgs = await _client(web).conversations_replies("C1", "1")
+        client = _client(web)
+        client._public_ids.add("C1")  # noqa: SLF001
+        msgs = await client.conversations_replies("C1", "1")
         assert [m["text"] for m in msgs] == ["root", "reply"]
 
 
@@ -69,6 +73,59 @@ class TestPostMessage:
     async def test_returns_ts_and_channel(self) -> None:
         web = AsyncMock()
         web.chat_postMessage = AsyncMock(return_value={"ts": "99.1", "channel": "C1"})
-        result = await _client(web).post_message("C1", "hello", thread_ts="1.0")
+        client = _client(web)
+        client._public_ids.add("C1")  # noqa: SLF001
+        result = await client.post_message("C1", "hello", thread_ts="1.0")
         assert result["ts"] == "99.1"
         web.chat_postMessage.assert_awaited_once_with(channel="C1", text="hello", thread_ts="1.0")
+
+
+class TestScopeGuardOnApiMethods:
+    """Verify that the scope guard blocks private channels and allows pre-validated ones."""
+
+    def _make_client_private(self) -> tuple[Any, SlackClient]:
+        """Return (web, client) where conversations_info reports a private channel."""
+        web = AsyncMock()
+        web.conversations_info = AsyncMock(
+            return_value={
+                "channel": {
+                    "id": "C9",
+                    "name": "secret",
+                    "is_channel": True,
+                    "is_private": True,
+                }
+            }
+        )
+        return web, _client(web)
+
+    async def test_conversations_replies_blocks_private(self) -> None:
+        _, client = self._make_client_private()
+        with pytest.raises(ScopeError):
+            await client.conversations_replies("C9", "1.0")
+
+    async def test_conversations_history_blocks_private(self) -> None:
+        _, client = self._make_client_private()
+        with pytest.raises(ScopeError):
+            await client.conversations_history("C9")
+
+    async def test_get_permalink_blocks_private(self) -> None:
+        _, client = self._make_client_private()
+        with pytest.raises(ScopeError):
+            await client.get_permalink("C9", "1.0")
+
+    async def test_post_message_blocks_private(self) -> None:
+        _, client = self._make_client_private()
+        with pytest.raises(ScopeError):
+            await client.post_message("C9", "hello")
+
+    async def test_cache_hit_skips_conversations_info(self) -> None:
+        """Pre-seeded id bypasses conversations_info entirely (cache-hit path)."""
+        web = AsyncMock()
+        web.conversations_history = AsyncMock(
+            return_value={"messages": [{"ts": "1", "text": "hi"}]}
+        )
+        client = _client(web)
+        client._public_ids.add("C1")  # noqa: SLF001
+        msgs = await client.conversations_history("C1")
+        assert msgs[0]["text"] == "hi"
+        web.conversations_info.assert_not_awaited()
