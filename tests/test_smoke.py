@@ -1,4 +1,4 @@
-"""Smoke test: the package imports and exposes a configured FastMCP instance."""
+"""Smoke test: the package imports and exposes a configured MCPServer instance."""
 
 from __future__ import annotations
 

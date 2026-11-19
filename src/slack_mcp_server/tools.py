@@ -13,7 +13,7 @@ from . import confirm, formatting
 from .app import mcp
 from .client import ScopeError, SlackApiError, get_slack_client
 
-_READ_ONLY = ToolAnnotations(readOnlyHint=True)
+_READ_ONLY = ToolAnnotations(read_only_hint=True)
 
 
 @mcp.tool(annotations=_READ_ONLY)

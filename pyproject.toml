@@ -12,7 +12,7 @@ requires-python = ">=3.10"
 keywords = ["mcp", "slack", "model-context-protocol"]
 
 dependencies = [
-    "mcp>=1.9.0",
+    "mcp>=2.3,<3",  # MCP SDK 2.x API (MCPServer / lowlevel handlers)
     "slack_sdk>=3.27.0",
     "pydantic>=2.0.0",
     "aiohttp>=3.14.1",
